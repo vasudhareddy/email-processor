@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 @Service
 public class EmailService {
 
-    private final String HUGGINGFACE_API_TOKEN = "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";
+    private final String HUGGINGFACE_API_TOKEN = "";//add your token
     private final String HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli";
     private final String HUGGINGFACE_LLM_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base";
 
