@@ -1,0 +1,23 @@
+<mat-card class="upload-dialog">
+  <h2 class="dialog-title">Email Upload</h2>
+
+  <div class="roles-section">
+    <p>Please choose a file and click upload.</p>
+
+    <div class="upload-controls">
+      <label class="custom-file-upload mat-raised-button">
+        <input type="file" (change)="onFileSelected($event)" />
+        Choose File
+      </label>
+
+      <button mat-raised-button color="primary" (click)="uploadFile()">Upload</button>
+    </div>
+  </div>
+
+  <div *ngIf="result" class="result-box">
+    <h3>Result</h3>
+    <pre>{{ result | json }}</pre>
+  </div>
+
+
+</mat-card>
