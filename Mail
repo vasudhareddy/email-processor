@@ -14,34 +14,54 @@ import static org.mockito.Mockito.*;
 class ApplicationTest {
 
     @Test
-    void testConfigureApplication() {
-        SpringApplicationBuilder mockBuilder = new SpringApplicationBuilder();
-        SpringApplicationBuilder mockConfiguredBuilder = spy(mockBuilder);
+    void testConfigureApplication_StaticPrivateMethod() {
+        // Arrange
+        SpringApplicationBuilder builder = new SpringApplicationBuilder();
+        SpringApplicationBuilder configuredBuilder = spy(builder);
 
-        try (MockedStatic<PlatformConfigurator> mocked = mockStatic(PlatformConfigurator.class)) {
-            mocked.when(() -> PlatformConfigurator.configure(mockBuilder)).thenReturn(mockConfiguredBuilder);
+        try (MockedStatic<PlatformConfigurator> mockedStatic = mockStatic(PlatformConfigurator.class)) {
+            mockedStatic.when(() -> PlatformConfigurator.configure(builder)).thenReturn(configuredBuilder);
 
-            SpringApplicationBuilder result = Application.configureApplication(mockBuilder);
+            // Act
+            SpringApplicationBuilder result = invokeConfigureApplication(builder);
+
+            // Assert
             assertNotNull(result);
-            verify(mockConfiguredBuilder).sources(Application.class); // Ensure `sources()` is called
+            verify(configuredBuilder).sources(Application.class);
         }
     }
 
     @Test
-    void testMain() {
-        try (MockedStatic<PlatformConfigurator> mocked = mockStatic(PlatformConfigurator.class)) {
+    void testMainMethod_StaticCall() {
+        try (MockedStatic<PlatformConfigurator> mockedStatic = mockStatic(PlatformConfigurator.class)) {
             SpringApplicationBuilder mockBuilder = mock(SpringApplicationBuilder.class);
 
+            // Mocking behavior
             when(mockBuilder.sources(Application.class)).thenReturn(mockBuilder);
             when(mockBuilder.run(any(String[].class))).thenReturn(null);
 
-            mocked.when(() -> PlatformConfigurator.configure(any(SpringApplicationBuilder.class)))
-                  .thenReturn(mockBuilder);
+            mockedStatic.when(() -> PlatformConfigurator.configure(any(SpringApplicationBuilder.class)))
+                        .thenReturn(mockBuilder);
 
-            Application.main(new String[]{});
+            // Act
+            Application.main(new String[]{"arg1", "arg2"});
 
+            // Verify
             verify(mockBuilder).sources(Application.class);
             verify(mockBuilder).run(any(String[].class));
+        } catch (Exception e) {
+            throw new RuntimeException("main method threw an exception", e);
+        }
+    }
+
+    // Helper to call private static method via reflection (optional, if configureApplication is private)
+    private SpringApplicationBuilder invokeConfigureApplication(SpringApplicationBuilder builder) {
+        try {
+            var method = Application.class.getDeclaredMethod("configureApplication", SpringApplicationBuilder.class);
+            method.setAccessible(true);
+            return (SpringApplicationBuilder) method.invoke(null, builder);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to invoke configureApplication", e);
         }
     }
 }
