@@ -5,7 +5,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+
+import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
@@ -14,54 +17,142 @@ import static org.mockito.Mockito.*;
 class ApplicationTest {
 
     @Test
-    void testConfigureApplication_StaticPrivateMethod() {
-        // Arrange
+    void testConfigureApplication_StaticPrivateMethod() throws Exception {
         SpringApplicationBuilder builder = new SpringApplicationBuilder();
         SpringApplicationBuilder configuredBuilder = spy(builder);
 
-        try (MockedStatic<PlatformConfigurator> mockedStatic = mockStatic(PlatformConfigurator.class)) {
-            mockedStatic.when(() -> PlatformConfigurator.configure(builder)).thenReturn(configuredBuilder);
+        try (MockedStatic<PlatformConfigurator> mocked = mockStatic(PlatformConfigurator.class)) {
+            mocked.when(() -> PlatformConfigurator.configure(builder)).thenReturn(configuredBuilder);
 
-            // Act
-            SpringApplicationBuilder result = invokeConfigureApplication(builder);
+            var method = Application.class.getDeclaredMethod("configureApplication", SpringApplicationBuilder.class);
+            method.setAccessible(true);
+            SpringApplicationBuilder result = (SpringApplicationBuilder) method.invoke(null, builder);
 
-            // Assert
             assertNotNull(result);
             verify(configuredBuilder).sources(Application.class);
         }
     }
 
     @Test
-    void testMainMethod_StaticCall() {
-        try (MockedStatic<PlatformConfigurator> mockedStatic = mockStatic(PlatformConfigurator.class)) {
+    void testMainMethodRunsSuccessfully() throws Exception {
+        try (MockedStatic<PlatformConfigurator> mocked = mockStatic(PlatformConfigurator.class)) {
             SpringApplicationBuilder mockBuilder = mock(SpringApplicationBuilder.class);
 
-            // Mocking behavior
             when(mockBuilder.sources(Application.class)).thenReturn(mockBuilder);
             when(mockBuilder.run(any(String[].class))).thenReturn(null);
 
-            mockedStatic.when(() -> PlatformConfigurator.configure(any(SpringApplicationBuilder.class)))
-                        .thenReturn(mockBuilder);
+            mocked.when(() -> PlatformConfigurator.configure(any(SpringApplicationBuilder.class)))
+                  .thenReturn(mockBuilder);
 
-            // Act
-            Application.main(new String[]{"arg1", "arg2"});
+            Application.main(new String[]{"arg1"});
 
-            // Verify
             verify(mockBuilder).sources(Application.class);
             verify(mockBuilder).run(any(String[].class));
-        } catch (Exception e) {
-            throw new RuntimeException("main method threw an exception", e);
         }
     }
 
-    // Helper to call private static method via reflection (optional, if configureApplication is private)
-    private SpringApplicationBuilder invokeConfigureApplication(SpringApplicationBuilder builder) {
-        try {
-            var method = Application.class.getDeclaredMethod("configureApplication", SpringApplicationBuilder.class);
-            method.setAccessible(true);
-            return (SpringApplicationBuilder) method.invoke(null, builder);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to invoke configureApplication", e);
-        }
+    @Test
+    void testPrimaryDataSourceProperties() {
+        Application app = new Application();
+        DataSourceProperties props = app.dataSourceProperties();
+        assertNotNull(props);
+    }
+
+    @Test
+    void testPrimaryDataSource() {
+        Application app = spy(new Application());
+
+        DataSourceProperties propsMock = mock(DataSourceProperties.class);
+        DataSource dsMock = mock(DataSource.class);
+
+        when(propsMock.initializeDataSourceBuilder()).thenReturn(() -> dsMock);
+        doReturn(propsMock).when(app).dataSourceProperties();
+
+        DataSource result = app.dataSource();
+        assertNotNull(result);
+    }
+
+    @Test
+    void testDevDataSourceProperties() {
+        Application app = new Application();
+        DataSourceProperties props = app.devDataSourceProperties();
+        assertNotNull(props);
+    }
+
+    @Test
+    void testDevDataSource() {
+        Application app = spy(new Application());
+
+        DataSourceProperties propsMock = mock(DataSourceProperties.class);
+        DataSource dsMock = mock(DataSource.class);
+
+        when(propsMock.initializeDataSourceBuilder()).thenReturn(() -> dsMock);
+        doReturn(propsMock).when(app).devDataSourceProperties();
+
+        DataSource result = app.devDataSource();
+        assertNotNull(result);
+    }
+
+    @Test
+    void testSitDataSourceProperties() {
+        Application app = new Application();
+        DataSourceProperties props = app.sitDataSourceProperties();
+        assertNotNull(props);
+    }
+
+    @Test
+    void testSitDataSource() {
+        Application app = spy(new Application());
+
+        DataSourceProperties propsMock = mock(DataSourceProperties.class);
+        DataSource dsMock = mock(DataSource.class);
+
+        when(propsMock.initializeDataSourceBuilder()).thenReturn(() -> dsMock);
+        doReturn(propsMock).when(app).sitDataSourceProperties();
+
+        DataSource result = app.sitDataSource();
+        assertNotNull(result);
+    }
+
+    @Test
+    void testUatDataSourceProperties() {
+        Application app = new Application();
+        DataSourceProperties props = app.uatDataSourceProperties();
+        assertNotNull(props);
+    }
+
+    @Test
+    void testUatDataSource() {
+        Application app = spy(new Application());
+
+        DataSourceProperties propsMock = mock(DataSourceProperties.class);
+        DataSource dsMock = mock(DataSource.class);
+
+        when(propsMock.initializeDataSourceBuilder()).thenReturn(() -> dsMock);
+        doReturn(propsMock).when(app).uatDataSourceProperties();
+
+        DataSource result = app.uatDataSource();
+        assertNotNull(result);
+    }
+
+    @Test
+    void testProdDataSourceProperties() {
+        Application app = new Application();
+        DataSourceProperties props = app.prodDataSourceProperties();
+        assertNotNull(props);
+    }
+
+    @Test
+    void testProdDataSource() {
+        Application app = spy(new Application());
+
+        DataSourceProperties propsMock = mock(DataSourceProperties.class);
+        DataSource dsMock = mock(DataSource.class);
+
+        when(propsMock.initializeDataSourceBuilder()).thenReturn(() -> dsMock);
+        doReturn(propsMock).when(app).prodDataSourceProperties();
+
+        DataSource result = app.prodDataSource();
+        assertNotNull(result);
     }
 }
