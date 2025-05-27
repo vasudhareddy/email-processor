@@ -1,1 +1,47 @@
-We’ve been approached multiple times over the past few days for minor issues. Although I’ve already helped them with the code and the Confluence pages for email dispatch, they’re still struggling and continue reaching out for calls. Yesterday, their product manager contacted me regarding HLRST changes and requested a call. I mentioned that I’d need your approval since these calls are taking up significant time
+package com.wellsfargo.mortgage.mccsa;
+
+import com.wellsfargo.unifiedframework.core.PlatformConfigurator;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ApplicationTest {
+
+    @Test
+    void testConfigureApplication() {
+        SpringApplicationBuilder mockBuilder = new SpringApplicationBuilder();
+        SpringApplicationBuilder mockConfiguredBuilder = spy(mockBuilder);
+
+        try (MockedStatic<PlatformConfigurator> mocked = mockStatic(PlatformConfigurator.class)) {
+            mocked.when(() -> PlatformConfigurator.configure(mockBuilder)).thenReturn(mockConfiguredBuilder);
+
+            SpringApplicationBuilder result = Application.configureApplication(mockBuilder);
+            assertNotNull(result);
+            verify(mockConfiguredBuilder).sources(Application.class); // Ensure `sources()` is called
+        }
+    }
+
+    @Test
+    void testMain() {
+        try (MockedStatic<PlatformConfigurator> mocked = mockStatic(PlatformConfigurator.class)) {
+            SpringApplicationBuilder mockBuilder = mock(SpringApplicationBuilder.class);
+
+            when(mockBuilder.sources(Application.class)).thenReturn(mockBuilder);
+            when(mockBuilder.run(any(String[].class))).thenReturn(null);
+
+            mocked.when(() -> PlatformConfigurator.configure(any(SpringApplicationBuilder.class)))
+                  .thenReturn(mockBuilder);
+
+            Application.main(new String[]{});
+
+            verify(mockBuilder).sources(Application.class);
+            verify(mockBuilder).run(any(String[].class));
+        }
+    }
+}
