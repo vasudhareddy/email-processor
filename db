@@ -1,0 +1,223 @@
+Got it.
+You want a **clean solution with repositories**, **dynamic DB selection**, and **zero repetitive try/finally**, using **AOP + annotation**.
+
+Here’s the **complete solution** combining:
+
+1. **`AbstractRoutingDataSource` for dynamic multi-DB JPA**
+2. **Spring Data JPA repositories (single set)**
+3. **`@UseDbEnv` annotation + AOP** to avoid boilerplate
+
+---
+
+## **1. Enum for Environments**
+
+```java
+public enum DbEnv {
+    DEV, SIT, UAT, PROD
+}
+```
+
+---
+
+## **2. Custom Annotation**
+
+```java
+@Target({ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface UseDbEnv {
+    DbEnv value();
+}
+```
+
+---
+
+## **3. Dynamic Routing DataSource**
+
+```java
+public class EnvironmentRoutingDataSource extends AbstractRoutingDataSource {
+    private static final ThreadLocal<DbEnv> context = new ThreadLocal<>();
+
+    public static void setCurrentDb(DbEnv env) {
+        context.set(env);
+    }
+
+    public static void clear() {
+        context.remove();
+    }
+
+    @Override
+    protected Object determineCurrentLookupKey() {
+        return context.get();
+    }
+}
+```
+
+---
+
+## **4. Spring Configuration**
+
+```java
+@Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(
+        basePackages = "com.example.repo",      // your repositories
+        entityManagerFactoryRef = "entityManagerFactory",
+        transactionManagerRef = "transactionManager"
+)
+public class MultiDBConfig {
+
+    @Bean
+    @ConfigurationProperties("spring.datasource.dev")
+    public DataSource devDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    @ConfigurationProperties("spring.datasource.sit")
+    public DataSource sitDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    @ConfigurationProperties("spring.datasource.uat")
+    public DataSource uatDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    @ConfigurationProperties("spring.datasource.prod")
+    public DataSource prodDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    public DataSource routingDataSource(
+            @Qualifier("devDataSource") DataSource dev,
+            @Qualifier("sitDataSource") DataSource sit,
+            @Qualifier("uatDataSource") DataSource uat,
+            @Qualifier("prodDataSource") DataSource prod) {
+
+        Map<Object, Object> targetDataSources = new HashMap<>();
+        targetDataSources.put(DbEnv.DEV, dev);
+        targetDataSources.put(DbEnv.SIT, sit);
+        targetDataSources.put(DbEnv.UAT, uat);
+        targetDataSources.put(DbEnv.PROD, prod);
+
+        EnvironmentRoutingDataSource routingDataSource = new EnvironmentRoutingDataSource();
+        routingDataSource.setTargetDataSources(targetDataSources);
+        routingDataSource.setDefaultTargetDataSource(dev);
+        return routingDataSource;
+    }
+
+    @Bean
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(
+            EntityManagerFactoryBuilder builder,
+            @Qualifier("routingDataSource") DataSource dataSource) {
+        return builder
+                .dataSource(dataSource)
+                .packages("com.example.entity") // all entities
+                .persistenceUnit("multiDBPU")
+                .build();
+    }
+
+    @Bean
+    public PlatformTransactionManager transactionManager(EntityManagerFactory emf) {
+        return new JpaTransactionManager(emf);
+    }
+}
+```
+
+---
+
+## **5. AOP for Annotation**
+
+```java
+@Aspect
+@Component
+public class DbEnvAspect {
+
+    @Around("@annotation(useDbEnv)")
+    public Object switchDbEnv(ProceedingJoinPoint pjp, UseDbEnv useDbEnv) throws Throwable {
+        try {
+            EnvironmentRoutingDataSource.setCurrentDb(useDbEnv.value());
+            return pjp.proceed();
+        } finally {
+            EnvironmentRoutingDataSource.clear();
+        }
+    }
+}
+```
+
+---
+
+## **6. Repository**
+
+```java
+@Repository
+public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    // You can also add custom queries if needed
+}
+```
+
+---
+
+## **7. Service Layer Usage**
+
+```java
+@Service
+public class EnvDataService {
+
+    private final UserRepository repo;
+
+    public EnvDataService(UserRepository repo) {
+        this.repo = repo;
+    }
+
+    @UseDbEnv(DbEnv.DEV)
+    public List<UserEntity> fetchDevUsers() {
+        return repo.findAll();
+    }
+
+    @UseDbEnv(DbEnv.SIT)
+    @Transactional
+    public void saveToSit(List<UserEntity> users) {
+        repo.saveAll(users);
+    }
+
+    @Transactional
+    public void copyData(DbEnv sourceEnv, DbEnv targetEnv) {
+        // dynamic approach using helper methods
+        List<UserEntity> data = fetchFromEnv(sourceEnv);
+        saveToEnv(targetEnv, data);
+    }
+
+    public List<UserEntity> fetchFromEnv(DbEnv env) {
+        EnvironmentRoutingDataSource.setCurrentDb(env);
+        List<UserEntity> data = repo.findAll();
+        EnvironmentRoutingDataSource.clear();
+        return data;
+    }
+
+    public void saveToEnv(DbEnv env, List<UserEntity> users) {
+        EnvironmentRoutingDataSource.setCurrentDb(env);
+        repo.saveAll(users);
+        EnvironmentRoutingDataSource.clear();
+    }
+}
+```
+
+---
+
+### ✅ **Key Benefits**
+
+* **Single repository** for all environments
+* **Dynamic DB selection** at runtime
+* **No redundant repositories or entity managers**
+* **`@UseDbEnv` annotation** handles static env methods automatically
+* **Dynamic helper methods** handle user-selected environments cleanly
+
+---
+
+If you want, I can **refactor this further** so that **even the `fetchFromEnv` and `saveToEnv` dynamic calls use annotation** without manually calling `setCurrentDb` anywhere.
+
+Do you want that **fully annotation-driven version with zero manual DB switch calls**?
