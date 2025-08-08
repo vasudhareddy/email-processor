@@ -1,223 +1,206 @@
-Got it.
-You want a **clean solution with repositories**, **dynamic DB selection**, and **zero repetitive try/finally**, using **AOP + annotation**.
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-Here’s the **complete solution** combining:
+    <groupId>com.wellsfargo.lending.services.laws</groupId>
+    <artifactId>LAWS-XmlBeans</artifactId>
+    <version>2.22.2</version>
+    <packaging>jar</packaging>
 
-1. **`AbstractRoutingDataSource` for dynamic multi-DB JPA**
-2. **Spring Data JPA repositories (single set)**
-3. **`@UseDbEnv` annotation + AOP** to avoid boilerplate
+    <name>LAWS-XmlBeans</name>
 
----
+    <parent>
+        <groupId>com.wellsfargo.lendinggrid</groupId>
+        <artifactId>base-pom</artifactId>
+        <version>2.1.95</version>
+    </parent>
 
-## **1. Enum for Environments**
+    <scm>
+        <connection>scm:git:https://github.wellsfargo.com/app-CLT/laws-xmlbeans.git</connection>
+        <developerConnection>scm:git:https://github.wellsfargo.com/app-CLT/laws-xmlbeans.git</developerConnection>
+        <url>https://github.wellsfargo.com/app-CLT/laws-xmlbeans</url>
+    </scm>
 
-```java
-public enum DbEnv {
-    DEV, SIT, UAT, PROD
-}
-```
+    <distributionManagement>
+        <site>
+            <id>site</id>
+            <url>https://some.root/${project.artifactId}/${project.version}/${jenkins.build.number}/</url>
+        </site>
+    </distributionManagement>
 
----
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <genesis.version>7.1.0.6</genesis.version>
+        <maven.dependency.plugin.version>3.1.0</maven.dependency.plugin.version>
+    </properties>
 
-## **2. Custom Annotation**
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.xmlbeans</groupId>
+            <artifactId>xmlbeans</artifactId>
+            <version>5.1.1</version>
+        </dependency>
 
-```java
-@Target({ElementType.METHOD})
-@Retention(RetentionPolicy.RUNTIME)
-public @interface UseDbEnv {
-    DbEnv value();
-}
-```
+        <dependency>
+            <groupId>org.apache.maven.surefire</groupId>
+            <artifactId>surefire-junit47</artifactId>
+            <version>2.18.1</version>
+        </dependency>
+    </dependencies>
 
----
+    <build>
+        <plugins>
 
-## **3. Dynamic Routing DataSource**
+            <!-- Java 17 Compiler -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
 
-```java
-public class EnvironmentRoutingDataSource extends AbstractRoutingDataSource {
-    private static final ThreadLocal<DbEnv> context = new ThreadLocal<>();
+            <!-- XMLBeans Maven Plugin -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>xmlbeans-maven-plugin</artifactId>
+                <version>5.1.1</version>
+                <executions>
+                    <execution>
+                        <id>xmlbeans</id>
+                        <goals>
+                            <goal>xmlbeans</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <schemaDirectory>src/main/xsd</schemaDirectory>
+                    <outputDirectory>target/generated-sources/xmlbeans</outputDirectory>
+                    <includes>
+                        <include>*.xsd</include>
+                    </includes>
+                </configuration>
+            </plugin>
 
-    public static void setCurrentDb(DbEnv env) {
-        context.set(env);
-    }
+            <!-- Include generated sources -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>target/generated-sources/xmlbeans</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
-    public static void clear() {
-        context.remove();
-    }
+            <!-- JaCoCo for coverage -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.5</version>
+                <executions>
+                    <execution>
+                        <id>default-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>pre-unit-test</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <destFile>${project.basedir}/target/jacoco.exec</destFile>
+                            <propertyName>surefireArgLine</propertyName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>post-unit-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.basedir}/target/jacoco.exec</dataFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>pre-integration-test</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <destFile>${project.basedir}/target/jacoco-it.exec</destFile>
+                            <propertyName>failsafeArgLine</propertyName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>post-integration-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.basedir}/target/jacoco-it.exec</dataFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 
-    @Override
-    protected Object determineCurrentLookupKey() {
-        return context.get();
-    }
-}
-```
+            <!-- Surefire Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.18.1</version>
+                <configuration>
+                    <testFailureIgnore>true</testFailureIgnore>
+                    <forkMode>always</forkMode>
+                    <argLine>-Xmx1024m -XX:MetaspaceSize=1024m -XX:MaxMetaspaceSize=1024m ${surefireArgLine} -enableassertions</argLine>
+                </configuration>
+            </plugin>
 
----
+            <!-- Flatten Plugin -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.2.7</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
-## **4. Spring Configuration**
+        </plugins>
+    </build>
 
-```java
-@Configuration
-@EnableTransactionManagement
-@EnableJpaRepositories(
-        basePackages = "com.example.repo",      // your repositories
-        entityManagerFactoryRef = "entityManagerFactory",
-        transactionManagerRef = "transactionManager"
-)
-public class MultiDBConfig {
-
-    @Bean
-    @ConfigurationProperties("spring.datasource.dev")
-    public DataSource devDataSource() {
-        return DataSourceBuilder.create().build();
-    }
-
-    @Bean
-    @ConfigurationProperties("spring.datasource.sit")
-    public DataSource sitDataSource() {
-        return DataSourceBuilder.create().build();
-    }
-
-    @Bean
-    @ConfigurationProperties("spring.datasource.uat")
-    public DataSource uatDataSource() {
-        return DataSourceBuilder.create().build();
-    }
-
-    @Bean
-    @ConfigurationProperties("spring.datasource.prod")
-    public DataSource prodDataSource() {
-        return DataSourceBuilder.create().build();
-    }
-
-    @Bean
-    public DataSource routingDataSource(
-            @Qualifier("devDataSource") DataSource dev,
-            @Qualifier("sitDataSource") DataSource sit,
-            @Qualifier("uatDataSource") DataSource uat,
-            @Qualifier("prodDataSource") DataSource prod) {
-
-        Map<Object, Object> targetDataSources = new HashMap<>();
-        targetDataSources.put(DbEnv.DEV, dev);
-        targetDataSources.put(DbEnv.SIT, sit);
-        targetDataSources.put(DbEnv.UAT, uat);
-        targetDataSources.put(DbEnv.PROD, prod);
-
-        EnvironmentRoutingDataSource routingDataSource = new EnvironmentRoutingDataSource();
-        routingDataSource.setTargetDataSources(targetDataSources);
-        routingDataSource.setDefaultTargetDataSource(dev);
-        return routingDataSource;
-    }
-
-    @Bean
-    public LocalContainerEntityManagerFactoryBean entityManagerFactory(
-            EntityManagerFactoryBuilder builder,
-            @Qualifier("routingDataSource") DataSource dataSource) {
-        return builder
-                .dataSource(dataSource)
-                .packages("com.example.entity") // all entities
-                .persistenceUnit("multiDBPU")
-                .build();
-    }
-
-    @Bean
-    public PlatformTransactionManager transactionManager(EntityManagerFactory emf) {
-        return new JpaTransactionManager(emf);
-    }
-}
-```
-
----
-
-## **5. AOP for Annotation**
-
-```java
-@Aspect
-@Component
-public class DbEnvAspect {
-
-    @Around("@annotation(useDbEnv)")
-    public Object switchDbEnv(ProceedingJoinPoint pjp, UseDbEnv useDbEnv) throws Throwable {
-        try {
-            EnvironmentRoutingDataSource.setCurrentDb(useDbEnv.value());
-            return pjp.proceed();
-        } finally {
-            EnvironmentRoutingDataSource.clear();
-        }
-    }
-}
-```
-
----
-
-## **6. Repository**
-
-```java
-@Repository
-public interface UserRepository extends JpaRepository<UserEntity, Long> {
-    // You can also add custom queries if needed
-}
-```
-
----
-
-## **7. Service Layer Usage**
-
-```java
-@Service
-public class EnvDataService {
-
-    private final UserRepository repo;
-
-    public EnvDataService(UserRepository repo) {
-        this.repo = repo;
-    }
-
-    @UseDbEnv(DbEnv.DEV)
-    public List<UserEntity> fetchDevUsers() {
-        return repo.findAll();
-    }
-
-    @UseDbEnv(DbEnv.SIT)
-    @Transactional
-    public void saveToSit(List<UserEntity> users) {
-        repo.saveAll(users);
-    }
-
-    @Transactional
-    public void copyData(DbEnv sourceEnv, DbEnv targetEnv) {
-        // dynamic approach using helper methods
-        List<UserEntity> data = fetchFromEnv(sourceEnv);
-        saveToEnv(targetEnv, data);
-    }
-
-    public List<UserEntity> fetchFromEnv(DbEnv env) {
-        EnvironmentRoutingDataSource.setCurrentDb(env);
-        List<UserEntity> data = repo.findAll();
-        EnvironmentRoutingDataSource.clear();
-        return data;
-    }
-
-    public void saveToEnv(DbEnv env, List<UserEntity> users) {
-        EnvironmentRoutingDataSource.setCurrentDb(env);
-        repo.saveAll(users);
-        EnvironmentRoutingDataSource.clear();
-    }
-}
-```
-
----
-
-### ✅ **Key Benefits**
-
-* **Single repository** for all environments
-* **Dynamic DB selection** at runtime
-* **No redundant repositories or entity managers**
-* **`@UseDbEnv` annotation** handles static env methods automatically
-* **Dynamic helper methods** handle user-selected environments cleanly
-
----
-
-If you want, I can **refactor this further** so that **even the `fetchFromEnv` and `saveToEnv` dynamic calls use annotation** without manually calling `setCurrentDb` anywhere.
-
-Do you want that **fully annotation-driven version with zero manual DB switch calls**?
+    <profiles>
+        <profile>
+            <id>someprofile</id>
+        </profile>
+    </profiles>
+</project>
